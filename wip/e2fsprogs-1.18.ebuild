@@ -1,7 +1,6 @@
 #this ebuild file overrides the default user_compile()
 A=${P}.tar.gz
- 
-user_compile() {
+
+src_configure() {
        ./configure --enable-elf-shlibs
-       make
 }

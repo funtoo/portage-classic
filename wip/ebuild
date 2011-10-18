@@ -31,53 +31,36 @@ then
 fi
 export DISTDIR
  
-ebuild_unpack() {
-	#make sure we're in the right directory
-	cd ${ORIGDIR}
- 
-	if [ -d ${WORKDIR} ]
-	then    
-		rm -rf ${WORKDIR}
-	fi
- 
-	mkdir ${WORKDIR}
-	cd ${WORKDIR}
-	if [ ! -e ${DISTDIR}/${A} ]
-	then
-		echo "${DISTDIR}/${A} does not exist.  Please download first."
-		exit 1
-	fi
-	tar xzf ${DISTDIR}/${A}
+try() {
+	$*
+	[ $? -ne 0 ] && echo "Error running command: $*" && exit 1
+}
+
+src_clean() {
+	[ -d ${WORKDIR} ] && rm -rf ${WORKDIR}; install -d ${WORKDIR}; cd ${WORKDIR}
+}
+
+src_unpack() {
+	[ ! -e ${DISTDIR}/${A} ] && echo "${DISTDIR}/${A} does not exist.  Please download first." && exit 1
+	try tar xf ${DISTDIR}/${A}
 	echo "Unpacked ${DISTDIR}/${A}."
-	#source is now correctly unpacked
+	[ ! -d $S ] && echo "Source directory $S specified in \$S does not exist. Exiting." && exit 1
 }
- 
-user_compile() {
-	#we're already in ${SRCDIR}
-	if [ -e configure ]
-	then
-		#run configure script if it exists
-		./configure --prefix=/usr
-	fi
-	#run make
-	make $MAKEOPTS MAKE="make $MAKEOPTS"  
-} 
- 
-ebuild_compile() {
-	if [ ! -d "${SRCDIR}" ]
-	then
-		echo "${SRCDIR} does not exist -- please unpack first."
-		exit 1
-	fi
-	#make sure we're in the right directory
-	cd ${SRCDIR}
-	user_compile
+
+src_compile() {
+	cd $S
+	try make $MAKEOPTS 
 }
- 
-export ORIGDIR=`pwd`
-export WORKDIR=${ORIGDIR}/work
+
+src_configure() {
+	cd $S
+	[ -e ./configure ] && try ./configure --prefix=/usr
+}
 
 P="${1%.ebuild}"
+export ORIGDIR=`pwd`
+export WORKDIR=${ORIGDIR}/work/$P
+S=$WORKDIR/$P
 
 if [ -e "$1" ]
 then
@@ -87,20 +70,30 @@ else
 	exit 1
 fi
 
-
-
-export SRCDIR=${WORKDIR}/${P}
- 
 case "${2}" in
+	clean)
+		src_clean
+		;;
 	unpack)
-		ebuild_unpack
+		src_clean
+		src_unpack
+		;;
+	configure)
+		src_clean
+		src_unpack
+		src_configure
 		;;
 	compile)
-		ebuild_compile
+		src_clean
+		src_unpack
+		src_configure
+		src_compile
 		;;
 	all)
-		ebuild_unpack
-		ebuild_compile
+		src_clean
+		src_unpack
+		src_configure
+		src_compile
 		;;
 	*)
 		echo "Please specify unpack, compile or all as the second arg"
