@@ -48,18 +48,21 @@ src_unpack() {
 }
 
 src_compile() {
-	cd $S
-	try make $MAKEOPTS 
+	cd $S; try make $MAKEOPTS 
 }
 
 src_configure() {
-	cd $S
-	[ -e ./configure ] && try ./configure --prefix=/usr
+	cd $S; [ -e ./configure ] && try ./configure --prefix=/usr 
+}
+
+src_install() {
+	cd $S; try make DESTDIR=$IMAGEDIR install
 }
 
 P="${1%.ebuild}"
-export ORIGDIR=`pwd`
-export WORKDIR=${ORIGDIR}/work/$P
+export ORIGDIR=$(pwd)
+export IMAGEDIR=${ORIGDIR}/temp/$P/image
+export WORKDIR=${ORIGDIR}/temp/$P/work
 S=$WORKDIR/$P
 
 if [ -e "$1" ]
@@ -89,14 +92,15 @@ case "${2}" in
 		src_configure
 		src_compile
 		;;
-	all)
+	install|all)
 		src_clean
 		src_unpack
 		src_configure
 		src_compile
+		src_install
 		;;
 	*)
-		echo "Please specify unpack, compile or all as the second arg"
+		echo "Please specify unpack, configure, compile or all as the second arg"
 		exit 1
 		;;
 esac
