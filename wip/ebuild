@@ -36,6 +36,10 @@ try() {
 	[ $? -ne 0 ] && echo "Error running command: $*" && exit 1
 }
 
+pkg_setup() {
+	return
+}
+
 src_clean() {
 	[ -d ${WORKDIR} ] && rm -rf ${WORKDIR}; install -d ${WORKDIR}; cd ${WORKDIR}
 }
@@ -73,6 +77,7 @@ else
 	exit 1
 fi
 
+pkg_setup
 case "${2}" in
 	clean)
 		src_clean
