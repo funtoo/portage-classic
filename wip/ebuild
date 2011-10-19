@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
 
+# Set a reasonable umask and turn off aliases that may interfere with the operation of the script:
+
 umask 022
 unalias -a
 
-if [ $# -ne 2 ]
-then
-	echo "Please specify ebuild file and unpack, compile or all"
+die() {
+	echo $*
 	exit 1
-fi
- 
-if [ -e ebuild.conf ]
-then
-	source ebuild.conf
-elif [ -e /etc/ebuild.conf ]
-then
-	source /etc/ebuild.conf
-else
-	echo "ebuild.conf not found. Exiting."
-fi
- 
-if [ -z "$DISTDIR" ]
-then
-	if [ -d distfiles ]
-	then
-		DISTDIR=$(pwd)/distfiles
-	else 	
-		# set DISTDIR to /usr/src/distfiles if not already set
-		DISTDIR=/usr/src/distfiles
-	fi
-fi
+}
+
+[ $# -ne 2 ] && die "Please specify ebuild filename and an action to perform."
+
+source_file() {
+	# look for and source a file in the current directory if it exists; otherwise, look for it in its offical
+	# canonical location (if provided as absolute path) and source it. Die if the file is not found.
+	for fn in "$@"
+	do
+		local cwdfn="${fn##*/}"
+		if [ -e ${cwdfn} ]; then
+			source ${cwdfn}
+		elif [ "${fn:0:1}" == "/" ] && [ -e ${fn} ]; then
+			source ${fn}
+		else
+			die "File $fn (or local equivalent) not found. Exiting."
+		fi
+	done
+}
+
+source_file /usr/share/portage/config/make.globals
+source_file ebuild.conf
 export DISTDIR
  
 try() {
@@ -56,28 +57,36 @@ src_compile() {
 }
 
 src_configure() {
-	cd $S; [ -e ./configure ] && try ./configure --prefix=/usr 
+	cd $S; [ -e ./configure ] && try econf
 }
 
 src_install() {
 	cd $S; try make DESTDIR=$IMAGEDIR install
 }
 
+econf() {
+	./configure \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--datadir=/usr/share \
+		--sysconfdir=/etc \
+		--localstatedir=/var/lib \
+		--disable-dependency-tracking \
+		"$@" 
+}
+
 P="${1%.ebuild}"
-export ORIGDIR=$(pwd)
-export IMAGEDIR=${ORIGDIR}/temp/$P/image
+PV="${P##*-}"
+ORIGDIR=$(pwd)
+IMAGEDIR=${ORIGDIR}/temp/$P/image
 export WORKDIR=${ORIGDIR}/temp/$P/work
 S=$WORKDIR/$P
 
-if [ -e "$1" ]
-then
-	source $1
-else
-	echo "Ebuild file $1 not found."
-	exit 1
-fi
+source_file "$1"
 
 pkg_setup
+
 case "${2}" in
 	clean)
 		src_clean
