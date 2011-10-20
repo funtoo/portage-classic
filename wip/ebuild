@@ -33,7 +33,7 @@ source_file() {
 source_file /usr/share/portage/config/make.globals
 source_file ebuild.conf
 export DISTDIR
- 
+
 try() {
 	# Wonder if it will be all right with double quotes.
 	if ! "$@"; then
@@ -49,20 +49,42 @@ src_clean() {
 	[ -d "${WORKDIR}" ] && rm -rf "${WORKDIR}"; install -d "${WORKDIR}"; cd "${WORKDIR}"
 }
 
+src_fetch() {
+	# Check is we already have sources downloaded.
+	# todo: need checksum check or something.
+	for source in "${sources[@]}"; do
+		if ! [ -f "${DISTDIR}/${source##*/}" ]; then
+			case "${source}" in
+				http://*|https://*)
+					einfo "Fetching ${source##*/} ..."
+					wget "${source}" -O "${DISTDIR}/${source##*/}"
+				;;
+				*)
+					die "You have to provide '${source##*/}'."
+				;;
+			esac
+		fi
+	done; unset source
+}
+
 src_unpack() {
-	[ ! -e ${DISTDIR}/${A} ] && die "${DISTDIR}/${A} does not exist.  Please download first."
+	for source in "${sources[@]}"; do
+		if ! [ -f "${DISTDIR}/${source##*/}" ]; then die "Missing source '${source##*/}'."; fi
 
-	case "${A}" in
-		*.tar|*.tar.bz2|*.tar.xz|*.tar.gz|l*.tar.lzma)
-			einfo "Extracting ${DISTDIR}/${A} ..."
-			try tar xf "${DISTDIR}/${A}" -C "${WORKDIR}"
-		;;
-		*)
-			die "Unsupported format."	
-		;;
-	esac
+		case "${source##*/}" in
+			*.tar|*.tar.bz2|*.tar.xz|*.tar.gz|l*.tar.lzma)
+				einfo "Extracting ${DISTDIR}/"${source##*/}" ..."
+				try tar xf "${DISTDIR}/${source##*/}" -C "${WORKDIR}"
+			;;
+			*)
+				die "Unsupported format."
+			;;
+		esac
+	done
 
-	[ ! -d $S ] && die "Source directory $S specified in \$S does not exist. Exiting."
+	# I think we should pre-create $S with package name and version and use '--strip-components 1' to tar.
+	# So we can unpack multiple sources file into one $S.
+	[ ! -d "$S" ] && die "Source directory $S specified in \$S does not exist. Exiting."
 }
 
 src_compile() {
@@ -87,7 +109,7 @@ econf() {
 		--sysconfdir=/etc \
 		--localstatedir=/var/lib \
 		--disable-dependency-tracking \
-		"$@" 
+		"$@"
 }
 
 P="${1%.ebuild}"
@@ -105,23 +127,30 @@ case "${2}" in
 	clean)
 		src_clean
 		;;
+	fetch)
+		src_fetch
+		;;
 	unpack)
 		src_clean
+		src_fetch
 		src_unpack
 		;;
 	configure)
 		src_clean
+		src_fetch
 		src_unpack
 		src_configure
 		;;
 	compile)
 		src_clean
+		src_fetch
 		src_unpack
 		src_configure
 		src_compile
 		;;
 	install|all)
 		src_clean
+		src_fetch
 		src_unpack
 		src_configure
 		src_compile
