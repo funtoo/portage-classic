@@ -5,8 +5,10 @@
 umask 022
 unalias -a
 
-die() { echo ">>> $@"; exit 1; }
-einfo() { echo ">>> $@"; }
+#die() { echo ">>> $@"; exit 1; }
+die() { echo -e "\033[1;31m>>> \033[0m$@"; exit 1; }
+#einfo() { echo ">>> $@"; }
+einfo() { echo -e "\033[1;32m>>> \033[0m$@"; }
 
 if ! [ -r "$1" ]; then
 	die "Please specify ebuild filename."
@@ -46,7 +48,11 @@ pkg_setup() {
 }
 
 src_clean() {
-	[ -d "${WORKDIR}" ] && rm -rf "${WORKDIR}"; install -d "${WORKDIR}"; cd "${WORKDIR}"
+	if [ -d "${WORKDIR}" ]; then
+		einfo "Cleaning old sources ..."
+		rm -rf "${WORKDIR}"
+	fi
+	install -d "${WORKDIR}"; cd "${WORKDIR}"
 }
 
 src_fetch() {
@@ -96,15 +102,18 @@ src_unpack() {
 }
 
 src_compile() {
+	einfo "Compiling source ..."
 	# Shoudn't we drop MAKEOPTS in favor of MAKEFLAGS variable which make use by default?
 	cd "$S"; try make "$MAKEOPTS"
 }
 
 src_configure() {
+	einfo "Configuring source ..."
 	cd "$S"; [ -e ./configure ] && try econf
 }
 
 src_install() {
+	einfo "Installing into '$IMAGEDIR' ..."
 	cd "$S"; try make DESTDIR="$IMAGEDIR" install
 }
 
