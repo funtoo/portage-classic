@@ -1,2 +1,2 @@
 #the sed ebuild file -- very simple!
-A=${P}.tar.gz
+sources=( "http://ftp.gnu.org/gnu/$PN/$PN-$PV.tar.bz2" )

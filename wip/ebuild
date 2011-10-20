@@ -5,7 +5,7 @@
 umask 022
 unalias -a
 
-die() { echo "$@"; exit 1; }
+die() { echo ">>> $@"; exit 1; }
 einfo() { echo ">>> $@"; }
 
 if ! [ -r "$1" ]; then
@@ -58,6 +58,10 @@ src_fetch() {
 				http://*|https://*)
 					einfo "Fetching ${source##*/} ..."
 					wget "${source}" -O "${DISTDIR}/${source##*/}"
+					if ! [ -s "${DISTDIR}/${source##*/}" ]; then
+						rm -f "${DISTDIR}/${source##*/}"
+						die "Unable to fetch ${source##*/}."
+					fi
 				;;
 				*)
 					die "You have to provide '${source##*/}'."
@@ -85,6 +89,10 @@ src_unpack() {
 	# I think we should pre-create $S with package name and version and use '--strip-components 1' to tar.
 	# So we can unpack multiple sources file into one $S.
 	[ ! -d "$S" ] && die "Source directory $S specified in \$S does not exist. Exiting."
+	
+	# We should cd into $S before src_configure is done or ebuild will fail when we override src_configure with an ebuild.
+	# like into e2fsprogs-1.18.ebuild.
+	cd "$S"
 }
 
 src_compile() {
@@ -114,6 +122,7 @@ econf() {
 
 P="${1%.ebuild}"
 PV="${P##*-}"
+PN="${P%-*}"
 ORIGDIR=$(pwd)
 IMAGEDIR=${ORIGDIR}/temp/$P/image
 export WORKDIR=${ORIGDIR}/temp/$P/work
