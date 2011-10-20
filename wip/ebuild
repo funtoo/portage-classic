@@ -20,9 +20,9 @@ source_file() {
 	for fn in "$@"
 	do
 		local cwdfn="${fn##*/}"
-		if [ -e "${cwdfn}" ]; then
+		if [ -r "${cwdfn}" ]; then
 			source "${cwdfn}"
-		elif [ "${fn:0:1}" = "/" ] && [ -e "${fn}" ]; then
+		elif [ "${fn:0:1}" = "/" ] && [ -r "${fn}" ]; then
 			source "${fn}"
 		else
 			die "File $fn (or local equivalent) not found. Exiting."
