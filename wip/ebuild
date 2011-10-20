@@ -10,7 +10,11 @@ die() {
 	exit 1
 }
 
-[ $# -ne 2 ] && die "Please specify ebuild filename and an action to perform."
+if ! [ -r "$1" ]; then
+	die "Please specify ebuild filename."
+elif [ -z "$2" ]; then
+	die "Please specify an action to perform."
+fi
 
 source_file() {
 	# look for and source a file in the current directory if it exists; otherwise, look for it in its offical
