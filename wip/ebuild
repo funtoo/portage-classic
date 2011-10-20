@@ -5,10 +5,8 @@
 umask 022
 unalias -a
 
-die() {
-	echo "$@"
-	exit 1
-}
+die() { echo "$@"; exit 1; }
+einfo() { echo ">>> $@"; }
 
 if ! [ -r "$1" ]; then
 	die "Please specify ebuild filename."
@@ -52,10 +50,19 @@ src_clean() {
 }
 
 src_unpack() {
-	[ ! -e ${DISTDIR}/${A} ] && echo "${DISTDIR}/${A} does not exist.  Please download first." && exit 1
-	try tar xf ${DISTDIR}/${A}
-	echo "Unpacked ${DISTDIR}/${A}."
-	[ ! -d $S ] && echo "Source directory $S specified in \$S does not exist. Exiting." && exit 1
+	[ ! -e ${DISTDIR}/${A} ] && die "${DISTDIR}/${A} does not exist.  Please download first."
+
+	case "${A}" in
+		*.tar|*.tar.bz2|*.tar.xz|*.tar.gz|l*.tar.lzma)
+			einfo "Extracting ${DISTDIR}/${A} ..."
+			try tar xf "${DISTDIR}/${A}" -C "${WORKDIR}"
+		;;
+		*)
+			die "Unsupported format."	
+		;;
+	esac
+
+	[ ! -d $S ] && die "Source directory $S specified in \$S does not exist. Exiting."
 }
 
 src_compile() {
