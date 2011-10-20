@@ -90,7 +90,7 @@ src_unpack() {
 				die "Unsupported format."
 			;;
 		esac
-	done
+	done; unset source
 
 	# I think we should pre-create $S with package name and version and use '--strip-components 1' to tar.
 	# So we can unpack multiple sources file into one $S.
