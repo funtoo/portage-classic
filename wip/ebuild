@@ -35,7 +35,12 @@ source_file() {
 source_file /usr/share/portage/config/make.globals
 source_file ebuild.conf
 export DISTDIR
-[ -z "${MAKEOPTS}" ] && MAKEOPTS="-j$(( $(cat /proc/cpuinfo | grep ^processor | wc -l ) + 1))"
+
+if [ -z "${MAKEOPTS}" ]; then
+	processors_num="$(grep -c '^processor' /proc/cpuinfo)" 
+	MAKEOPTS="--jobs=$(( ${processors_num} + 1))"
+fi
+
 export MAKEOPTS
 
 try() {
