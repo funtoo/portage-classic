@@ -35,9 +35,12 @@ source_file() {
 source_file /usr/share/portage/config/make.globals
 source_file ebuild.conf
 export DISTDIR
+[ -z "${MAKEOPTS}" ] && MAKEOPTS="-j$(( $(cat /proc/cpuinfo | grep ^processor | wc -l ) + 1))"
+export MAKEOPTS
 
 try() {
 	# Wonder if it will be all right with double quotes.
+	einfo "$@"
 	if ! "$@"; then
 		die "Error running command: $@";
 	fi
