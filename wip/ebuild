@@ -44,11 +44,8 @@ fi
 export MAKEOPTS
 
 try() {
-	# Wonder if it will be all right with double quotes.
 	einfo "$@"
-	if ! "$@"; then
-		die "Error running command: $@";
-	fi
+	"$@" || die "Error running command: $@"
 }
 
 pkg_setup() {
@@ -117,7 +114,7 @@ src_compile() {
 
 src_configure() {
 	einfo "Configuring source ..."
-	cd "$S"; [ -e ./configure ] && try econf
+	cd "$S"; [ -e ./configure ] && econf
 }
 
 src_install() {
@@ -126,7 +123,7 @@ src_install() {
 }
 
 econf() {
-	./configure \
+	try ./configure \
 		--prefix=/usr \
 		--mandir=/usr/share/man \
 		--infodir=/usr/share/info \
