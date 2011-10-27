@@ -134,9 +134,13 @@ econf() {
 		"$@"
 }
 
-P="${1%.ebuild}"
-PV="${P##*-}"
-PN="${P%-*}"
+PV="${1##*/}"
+rest="${1%/*}"
+PN="${rest##*/}"
+rest="${rest%/*}"
+CATEGORY="${rest##*/}"
+rest="${rest%/*}"
+PORTDIR="${rest##*/}"
 ORIGDIR=$(pwd)
 IMAGEDIR=${ORIGDIR}/temp/$P/image
 export WORKDIR=${ORIGDIR}/temp/$P/work
