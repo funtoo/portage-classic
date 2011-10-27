@@ -1,0 +1,6 @@
+{
+	mask: false
+	keywords: ~x86
+	use: blab -florb
+}
+

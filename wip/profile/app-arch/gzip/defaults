@@ -1,0 +1,5 @@
+select("*").({
+	mask: true
+});
+
+/* js syntax? */
