@@ -18,13 +18,15 @@ fi
 
 source_file() {
 	# look for and source a file in the current directory if it exists; otherwise, look for it in its offical
-	# canonical location (if provided as absolute path) and source it. Die if the file is not found.
+	# canonical location (absolute or relative path) and source it. Die if the file is not found.
 	for fn in "$@"
 	do
 		local cwdfn="${fn##*/}"
 		if [ -r "${cwdfn}" ]; then
+			einfo "Reading ${cwdfn}..."
 			source "${cwdfn}"
-		elif [ "${fn:0:1}" = "/" ] && [ -r "${fn}" ]; then
+		elif [ -r "${fn}" ]; then
+			einfo "Reading ${fn}..."
 			source "${fn}"
 		else
 			die "File $fn (or local equivalent) not found. Exiting."
@@ -33,7 +35,6 @@ source_file() {
 }
 
 source_file /usr/share/portage/config/make.globals
-source_file ebuild.conf
 export DISTDIR
 
 if [ -z "${MAKEOPTS}" ]; then
@@ -83,7 +84,9 @@ src_fetch() {
 }
 
 src_unpack() {
+	echo "in unpack"
 	for source in "${sources[@]}"; do
+		echo "processing $source"
 		if ! [ -f "${DISTDIR}/${source##*/}" ]; then die "Missing source '${source##*/}'."; fi
 
 		case "${source##*/}" in
@@ -137,16 +140,20 @@ econf() {
 PV="${1##*/}"
 rest="${1%/*}"
 PN="${rest##*/}"
+P=$PN-$PV
 rest="${rest%/*}"
 CATEGORY="${rest##*/}"
 rest="${rest%/*}"
 PORTDIR="${rest##*/}"
-ORIGDIR=$(pwd)
-IMAGEDIR=${ORIGDIR}/temp/$P/image
-export WORKDIR=${ORIGDIR}/temp/$P/work
-S=$WORKDIR/$P
-
-source_file "$1"
+ORIGDIR="$(pwd)"
+IMAGEDIR="${ORIGDIR}/temp/$P/image"
+export WORKDIR="${ORIGDIR}/temp/$P/work"
+install -d "$WORKDIR"
+S="$WORKDIR/$P"
+defaults_file="$PORTDIR/$CATEGORY/$PN/defaults"
+build_file="$1"
+[ -r "${defaults_file}" ] && source_file "${defaults_file}"
+source_file "$build_file"
 
 pkg_setup
 
