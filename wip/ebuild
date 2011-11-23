@@ -4,50 +4,66 @@
 
 umask 022
 unalias -a
-
-#die() { echo ">>> $@"; exit 1; }
-die() { echo -e "\033[1;31m>>> \033[0m$@"; exit 1; }
-#einfo() { echo ">>> $@"; }
+die() { echo -e "\033[1;31m>>> \033[0m$@" 1>&2; exit 1; }
 einfo() { echo -e "\033[1;32m>>> \033[0m$@"; }
+try() { einfo "$@"; "$@" || die "Error running command: $@"; }
 
-if ! [ -r "$1" ]; then
-	die "Please specify ebuild filename."
-elif [ -z "$2" ]; then
+PV="${1##*-}"
+rest="${1%-*}"
+PN="${rest##*/}"
+CATEGORY="${1%%/*}"
+P=$PN-$PV
+build_file="$1"
+if [ -z "$2" ]; then
 	die "Please specify an action to perform."
 fi
+action="$2"
 
 source_file() {
-	# look for and source a file in the current directory if it exists; otherwise, look for it in its offical
-	# canonical location (absolute or relative path) and source it. Die if the file is not found.
+	local prefix="$1"
+	shift
 	for fn in "$@"
 	do
-		local cwdfn="${fn##*/}"
-		if [ -r "${cwdfn}" ]; then
-			einfo "Reading ${cwdfn}..."
-			source "${cwdfn}"
-		elif [ -r "${fn}" ]; then
-			einfo "Reading ${fn}..."
-			source "${fn}"
-		else
-			die "File $fn (or local equivalent) not found. Exiting."
-		fi
+		fn="$prefix/$fn"
+		[ ! -r "${fn}" ] && die "File $fn not found. Exiting."
+		einfo "Reading ${fn}..."
+		source "${fn}"
 	done
 }
 
-source_file /usr/share/portage/config/make.globals
-export DISTDIR
+source_link() {
+	[ ! -L "$2" ] && die "Symbolic link $2 does not exist."
+	[ ! -d "$2" ] && die "Target of symbolic link $2 does not exist or is not a directory."
+	eval $1="$(readlink -f $2)"
+}
 
-if [ -z "${MAKEOPTS}" ]; then
-	processors_num="$(grep -c '^processor' /proc/cpuinfo)" 
-	MAKEOPTS="--jobs=$(( ${processors_num} + 1))"
+# Configure application name and core config path:
+
+appname="up"
+if [ ! -d /etc/$appname ]; then
+	cfgpath="$(pwd)/etc"
+else
+	cfgpath="/etc/$appname"
 fi
 
-export MAKEOPTS
+# Read in base config settings and set main paths:
 
-try() {
-	einfo "$@"
-	"$@" || die "Error running command: $@"
-}
+source_file "$cfgpath/globals"
+source_link PORTDIR $cfgpath/portdir
+source_link DISTDIR $cfgpath/distdir
+source_link WORKDIR $cfgpath/workdir
+ORIGDIR="$(pwd)"
+IMAGEDIR="${WORKDIR}/temp/$P/image"
+export WORKDIR="${WORKDIR}/temp/$P/work"
+install -d "$WORKDIR"
+export S="$WORKDIR/$P"
+
+# Set reasonable defaults:
+
+export NUMCPU="$(grep -c '^processor' /proc/cpuinfo)" 
+if [ -z "${MAKEOPTS}" ]; then
+	export MAKEOPTS="--jobs=$NUMCPU"
+fi
 
 pkg_setup() {
 	return
@@ -137,27 +153,15 @@ econf() {
 		"$@"
 }
 
-PV="${1##*/}"
-rest="${1%/*}"
-PN="${rest##*/}"
-P=$PN-$PV
-rest="${rest%/*}"
-CATEGORY="${rest##*/}"
-rest="${rest%/*}"
-PORTDIR="${rest##*/}"
-ORIGDIR="$(pwd)"
-IMAGEDIR="${ORIGDIR}/temp/$P/image"
-export WORKDIR="${ORIGDIR}/temp/$P/work"
-install -d "$WORKDIR"
-S="$WORKDIR/$P"
-defaults_file="$PORTDIR/$CATEGORY/$PN/defaults"
-build_file="$1"
-[ -r "${defaults_file}" ] && source_file "${defaults_file}"
-source_file "$build_file"
+# process ebuild
+
+if [ -e "$PORTDIR/$CATEGORY/$PN/defaults" ]; then
+	source_file "$PORTDIR/$CATEGORY/$PN" "defaults"
+fi
+source_file "$PORTDIR/$CATEGORY/$PN" "$PV"
 
 pkg_setup
-
-case "${2}" in
+case "${action}" in
 	clean)
 		src_clean
 		;;
