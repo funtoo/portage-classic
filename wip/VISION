@@ -1,0 +1,45 @@
+This is a general outline of the vision/concept for the development of the code in "wip":
+
+Problems with Portage
+=====================
+
+This code is intended to correct some deficiencies in the current Portage code.
+The current Portage code in Gentoo Linux is very complicated. In addition,
+while Portage is designed to resolve package dependencies and merge ebuilds in
+the right order, it suffers from an enormous number of _internal_ code
+dependencies. Once piece of code depends on another, and there is very tight
+coupling between many parts of the code. As such, it is extremely difficult to
+maintain and improve.
+
+In addition, Portage code is largely uncommented an often written in a way that
+requires an unreasonable amount of time to properly understand.
+
+How To Fix It
+=============
+
+To fix these problems, "wip" is intended to implement a reasonable subset of
+Portage functionality in a compact, easy-to-understand, maintainable code base.
+There is no hard requirement to adhere to any Portage or ebuild specification,
+and improvements can be made to various parts of Portage.
+
+For the code, it should be maintainable and kept it bash for as long as
+possible. For parts that may require a more capable language like Python,
+delay implementation and we can implement these as a higher layer in
+commands like emerge. There should not be a tight coupling between ebuild
+and emerge. And the code in "wip" does not need to handle dependencies.
+
+Code should be simple and easy to understand, commented where necessary,
+minimalistic, and modular. Inter-dependencies within the code should be kept to
+an absolute minimum, so that one part of the code can be improved without
+requiring changes in other parts.
+
+The Result
+==========
+
+The result of this effort should create an elegant code base that implments a
+ton of functionality with very little code. The code should be easy to
+understand and improve. In addition, the functionality should be an improvement
+on Portage behavior and provide a better foundation for writing and running
+ebuilds for the future. It should implement all the functionality that is
+reasonable to implement in bash, but should not try to implement anything too
+ugly to implement in a shell script.
