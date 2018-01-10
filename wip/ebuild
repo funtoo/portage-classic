@@ -6,14 +6,16 @@ umask 022
 unalias -a
 die() { echo -e "\033[1;31m>>> \033[0m$@" 1>&2; exit 1; }
 einfo() { echo -e "\033[1;32m>>> \033[0m$@"; }
+eerror() { echo -e "\033[1;35m!!! \033[0m$@"; }
+eend() { return 0; }
 try() { einfo "$@"; "$@" || die "Error running command: $@"; }
 
-PV="${1##*-}"
-rest="${1%-*}"
-PN="${rest##*/}"
-CATEGORY="${1%%/*}"
+# specify a catpkg like so: sys-apps/foo:1.0
+CATEGORY=${1%%/*}
+PV=${1##*:}
+PN=${1##*/}
+PN=${PN%%:*}
 P=$PN-$PV
-build_file="$1"
 if [ -z "$2" ]; then
 	die "Please specify an action to perform."
 fi
@@ -39,12 +41,7 @@ source_link() {
 
 # Configure application name and core config path:
 
-appname="up"
-if [ ! -d /etc/$appname ]; then
-	cfgpath="$(pwd)/etc"
-else
-	cfgpath="/etc/$appname"
-fi
+cfgpath="$(pwd)/etc"
 
 # Read in base config settings and set main paths:
 
@@ -54,9 +51,12 @@ source_link DISTDIR $cfgpath/distdir
 source_link WORKDIR $cfgpath/workdir
 ORIGDIR="$(pwd)"
 IMAGEDIR="${WORKDIR}/temp/$P/image"
+export T="${WORKDIR}/temp/$P/tmp"
 export WORKDIR="${WORKDIR}/temp/$P/work"
+export FILESDIR=$PORTDIR/$CATEGORY/$PN/files
 install -d "$WORKDIR"
 export S="$WORKDIR/$P"
+install -d $T
 
 # Set reasonable defaults:
 
@@ -64,6 +64,9 @@ export NUMCPU="$(grep -c '^processor' /proc/cpuinfo)"
 if [ -z "${MAKEOPTS}" ]; then
 	export MAKEOPTS="--jobs=$NUMCPU"
 fi
+
+. eclass/estack.eclass
+. eclass/epatch.eclass
 
 pkg_setup() {
 	return
@@ -80,10 +83,13 @@ src_clean() {
 src_fetch() {
 	# Check is we already have sources downloaded.
 	# todo: need checksum check or something.
-	for source in "${sources[@]}"; do
+	for source in $SRC_URI; do
 		if ! [ -f "${DISTDIR}/${source##*/}" ]; then
+			if [ "${source: -1}" == "?" ]; then
+				continue
+			fi
 			case "${source}" in
-				http://*|https://*)
+				http://*|https://*|ftp://*)
 					einfo "Fetching ${source##*/} ..."
 					wget "${source}" -O "${DISTDIR}/${source##*/}"
 					if ! [ -s "${DISTDIR}/${source##*/}" ]; then
@@ -91,12 +97,35 @@ src_fetch() {
 						die "Unable to fetch ${source##*/}."
 					fi
 				;;
+				\)|\():
+					# skip parens
+					continue
+					;;
 				*)
 					die "You have to provide '${source##*/}'."
 				;;
 			esac
 		fi
 	done; unset source
+}
+
+unpack() {
+	for source in $*; do
+		einfo "Extracting ${DISTDIR}/"${source##*/}" ..."
+		try tar xf "${DISTDIR}/${source##*/}" -C "${WORKDIR}"
+	done
+}
+
+pax-mark() {
+	return 0
+}
+
+compiler_auto_enable() {
+	return 0
+}
+
+src_prepare() {
+	return 0
 }
 
 src_unpack() {
@@ -107,8 +136,7 @@ src_unpack() {
 
 		case "${source##*/}" in
 			*.tar|*.tar.bz2|*.tar.xz|*.tar.gz|l*.tar.lzma)
-				einfo "Extracting ${DISTDIR}/"${source##*/}" ..."
-				try tar xf "${DISTDIR}/${source##*/}" -C "${WORKDIR}"
+				unpack ${source##*/}
 			;;
 			*)
 				die "Unsupported format."
@@ -125,11 +153,91 @@ src_unpack() {
 	cd "$S"
 }
 
+emake() {
+	try make "$MAKEOPTS" $@
+}
+
+dodir() {
+	install -d $IMAGEDIR/$1
+}
+
+prepstrip() {
+	return
+}
+
+compiler_auto_enable() {
+	return
+}
+
+export EXE_INTO_PATH="/usr/bin"
+exeinto() {
+	export EXE_INTO_PATH=$1
+}
+
+use_driver() {
+
+	local found=0
+	local suffix
+
+	for x in $USE; do
+		if [ "$x" == "$2" ]; then
+			found=1
+			break
+		fi
+	done
+
+	if [ -n "$3" ]; then
+		suffix="$3"
+	else
+		suffix="$2"
+	fi
+
+	if [ $found -eq 1 ]; then
+		echo "--${1%%:*}-${suffix}"
+	else
+		echo "--${1##*:}-${suffix}"
+	fi
+}
+
+use_with() {
+	use_driver with:without $@
+}
+
+use_enable() {
+	use_driver enable:disable $@
+}
+
+use() {
+	for x in $USE; do
+		if [ "$x" == "$1" ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+doexe() {
+	install -d $IMAGEDIR/$EXE_INTO_PATH
+	cp $1 $IMAGEDIR/$EXE_INTO_PATH
+}
+
+has() {
+	if [ "$1" == "noinfo" ]; then
+		return 0
+	elif [ "$1" == "noman" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 src_compile() {
 	einfo "Compiling source ..."
 	# Shoudn't we drop MAKEOPTS in favor of MAKEFLAGS variable which make use by default?
 	cd "$S"; try make "$MAKEOPTS"
 }
+
+
 
 src_configure() {
 	einfo "Configuring source ..."
@@ -173,25 +281,35 @@ case "${action}" in
 		src_fetch
 		src_unpack
 		;;
+	prepare)
+		src_clean && \
+		src_fetch && \
+		src_unpack && \
+		src_prepare
+		;;
 	configure)
-		src_clean
-		src_fetch
-		src_unpack
+		src_clean && \
+		src_fetch && \
+		src_unpack && \
+		src_prepare && \
 		src_configure
 		;;
 	compile)
-		src_clean
-		src_fetch
-		src_unpack
-		src_configure
+		src_clean && \
+		src_fetch && \
+		src_unpack && \
+		src_prepare && \
+		src_configure && \
 		src_compile
 		;;
 	install|all)
-		src_clean
-		src_fetch
-		src_unpack
-		src_configure
-		src_compile
+		src_clean && \
+		src_fetch && \
+		src_unpack && \
+		src_prepare && \
+		src_configure && \
+		src_compile && \
+		install -d $IMAGEDIR && \
 		src_install
 		;;
 	*)
